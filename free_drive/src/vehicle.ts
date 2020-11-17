@@ -7,7 +7,7 @@ export class VehicleInfo {
     mass: number = 800;
     // 底盘
     chassisSize: Ammo.btVector3;
-    chassisMesh: THREE.Mesh;
+    chassisMesh: THREE.Object3D;
 
     // 轮胎
     wheelPositions: Ammo.btVector3[] = [];
@@ -43,22 +43,22 @@ export class VehicleInfo {
         const backWheelRadius = 0.4;
         const backWheelWidth = 0.3;
         // front left
-        this.wheelPositions.push(new GAmmo.btVector3(1, 0.3, 1.7));
+        this.wheelPositions.push(new GAmmo.btVector3(1, 0.0, 1.7));
         this.wheelRadius.push(frontWheelRadius);
         this.wheelMeshes.push(this.calibrateWheelMesh(frontWheelRadius, frontWheelWidth));
         this.wheelCanDrive.push(true);
         // front right
-        this.wheelPositions.push(new GAmmo.btVector3(-1, 0.3, 1.7));
+        this.wheelPositions.push(new GAmmo.btVector3(-1, 0.0, 1.7));
         this.wheelRadius.push(frontWheelRadius);
         this.wheelMeshes.push(this.calibrateWheelMesh(frontWheelRadius, frontWheelWidth));
         this.wheelCanDrive.push(true);
         // back left
-        this.wheelPositions.push(new GAmmo.btVector3(1, 0.3, -1));
+        this.wheelPositions.push(new GAmmo.btVector3(1, 0.0, -1));
         this.wheelRadius.push(backWheelRadius);
         this.wheelMeshes.push(this.calibrateWheelMesh(backWheelRadius, backWheelWidth));
         this.wheelCanDrive.push(false);
         // back right
-        this.wheelPositions.push(new GAmmo.btVector3(-1, 0.3, -1));
+        this.wheelPositions.push(new GAmmo.btVector3(-1, 0.0, -1));
         this.wheelRadius.push(backWheelRadius);
         this.wheelMeshes.push(this.calibrateWheelMesh(backWheelRadius, backWheelWidth));
         this.wheelCanDrive.push(false);
@@ -99,6 +99,8 @@ export class Vehicle {
     vehicle: Ammo.btRaycastVehicle;
     tuning: Ammo.btVehicleTuning;
     vehicleInfo: VehicleInfo;
+    speedLimit: number = 130;
+    engineForce: number = 0;
 
     constructor(physicsWorld: Ammo.btDiscreteDynamicsWorld) {
         this.physicsWorld = physicsWorld;
@@ -182,23 +184,77 @@ export class Vehicle {
             this.vehicleInfo.wheelMeshes[i].position.set(p.x(), p.y(), p.z());
             this.vehicleInfo.wheelMeshes[i].quaternion.set(q.x(), q.y(), q.z(), q.w());
         }
+
+        if (this.getSpeed() > this.speedLimit + 5) {
+            this.vehicle.applyEngineForce(0, 0);
+            this.vehicle.applyEngineForce(0, 1);
+        } else if (this.getSpeed() < this.speedLimit - 10) {
+            this.vehicle.applyEngineForce(this.engineForce, 0);
+            this.vehicle.applyEngineForce(this.engineForce, 1);
+        }
+    }
+
+    thChassisNode() {
+        return this.vehicleInfo.chassisMesh;
     }
 
     // control behaviors
-    drive() {
-
+    enableDrive() {
+        if (this.engineForce > 0) {
+            return;
+        }
+        console.log(">>>>>>>>> applyEngineForce 2000");
+        this.vehicle.applyEngineForce(2000, 0);
+        this.vehicle.applyEngineForce(2000, 1);
+        this.engineForce = 2000;
     }
 
-    brake() {
+    disableDrive() {
+        if (this.engineForce == 0) {
+            return;
+        }
+        this.vehicle.applyEngineForce(0, 0);
+        this.vehicle.applyEngineForce(0, 1);
+        this.vehicle.setBrake(60, 0);
+        this.vehicle.setBrake(60, 1);
+        this.engineForce = 0;
+    }
 
+    enableBrake() {
+        this.vehicle.setBrake(1000, 0);
+        this.vehicle.setBrake(1000, 1);
+        this.vehicle.setBrake(1000, 2);
+        this.vehicle.setBrake(1000, 3);
+    }
+    disableBrake() {
+        this.vehicle.setBrake(0, 0);
+        this.vehicle.setBrake(0, 1);
+        this.vehicle.setBrake(0, 2);
+        this.vehicle.setBrake(0, 3);
     }
 
     turnLeft() {
-
+        this.vehicle.setSteeringValue(0.8, 0);
+        this.vehicle.setSteeringValue(0.8, 1);
     }
 
     turnRight() {
-        
+        this.vehicle.setSteeringValue(-0.8, 0);
+        this.vehicle.setSteeringValue(-0.8, 1);
+    }
+
+    turnClose() {
+        this.vehicle.setSteeringValue(0, 0);
+        this.vehicle.setSteeringValue(0, 1);
+    }
+
+    // km/hour
+    setSpeedLimit(limit) {
+        this.speedLimit = limit;
+    }
+
+    getSpeed() {
+        return this.vehicle.getCurrentSpeedKmHour();
     }
 
     // camera control
