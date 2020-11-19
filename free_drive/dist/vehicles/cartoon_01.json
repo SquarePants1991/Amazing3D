@@ -1,4 +1,46 @@
 {
     "files": ["models/01.glb"],
-    
+    "body": {
+        "mesh": {
+            "file": 0,
+            "name": "CarBody",
+            "translate": [0,0,0],
+            "scale": [0.01,0.01,0.01],
+            "rotate": [0,0,3.1415]
+        },
+        "config": {
+            "mass": 800,
+            "frictionSlip": 1000,
+            "suspensionStiffness": 20.0,
+            "suspensionDamping": 2.3,
+            "suspensionCompression": 4.4,
+            "suspensionRestLength": 0.6,
+            "rollInfluence": 1.0
+        }
+    },
+    "wheel": {
+        "mesh": {
+            "file": 0,
+            "name": "Wheel",
+            "scale": [0.01,0.01,0.01]
+        },
+        "configs": [
+            {
+                "position": [0.8, 0.05, 1.1],
+                "drive": true 
+            },
+            {
+                "position": [-0.8, 0.05, 1.1],
+                "drive": true 
+            },
+            {
+                "position": [0.8, 0.05, -1.2],
+                "drive": false 
+            },
+            {
+                "position": [-0.8, 0.05, 1.2],
+                "drive": false 
+            }
+        ]
+    }
 }

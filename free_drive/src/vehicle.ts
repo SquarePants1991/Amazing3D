@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import Ammo from 'ammojs-typed';
 import './global_ammo'
+import { FileLoader } from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 export class VehicleInfo {
     mass: number = 800;
@@ -86,9 +88,110 @@ export class VehicleInfo {
         });
         let mesh = new THREE.Mesh(gem, mat);
         let wrapper = new THREE.Object3D();
-        mesh.quaternion.setFromAxisAngle(new THREE.Vector3(0,0,1), Math.PI * 0.5);
+        mesh.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI * 0.5);
         wrapper.add(mesh);
         return wrapper;
+    }
+
+    async loadFromConfig(configFileUrl, completed) {
+        let fileLoader = new FileLoader();
+        const objLoader = new GLTFLoader();
+        let data = await fileLoader.loadAsync(configFileUrl);
+        let jsonObj = null;
+        try {
+            jsonObj = JSON.parse(data);
+        } catch (e) { }
+        if (jsonObj == null) {
+            return completed(false, null);
+        }
+        console.log(data);
+        // 1. find files & load
+        var files = [];
+        let filesPath = jsonObj["files"];
+        if (!filesPath) {
+            return completed(false, null);
+        }
+        for (let filePath of filesPath) {
+            let file = await objLoader.loadAsync(filePath);
+            files.push(file);
+        }
+        // 2. load body
+        {
+            let body = jsonObj["body"];
+            let mesh = files[body["mesh"]["file"]].scene.getObjectByName(body["mesh"]["name"]);
+            if (body["mesh"]["translate"]) {
+                mesh.position.set(body["mesh"]["translate"][0], body["mesh"]["translate"][1], body["mesh"]["translate"][2]);
+            }
+            if (body["mesh"]["scale"]) {
+                mesh.scale.set(body["mesh"]["scale"][0], body["mesh"]["scale"][1], body["mesh"]["scale"][2]);
+            }
+            if (body["mesh"]["rotate"]) {
+                mesh.rotateX(body["mesh"]["rotate"][0]);
+                mesh.rotateY(body["mesh"]["rotate"][1]);
+                mesh.rotateZ(body["mesh"]["rotate"][2]);
+            }
+            let bodyObject3D = new THREE.Object3D();
+            let bodyBox = new THREE.Box3().setFromObject(mesh);
+            this.chassisSize = new GAmmo.btVector3(bodyBox.max.x - bodyBox.min.x, bodyBox.max.y - bodyBox.min.y, bodyBox.max.z - bodyBox.min.z);
+            if (this.useCalibrateMesh) {
+                this.chassisMesh = this.calibrateChassisMesh(this.chassisSize);
+            } else {
+                this.chassisMesh = bodyObject3D;
+            }
+            bodyObject3D.add(this.chassisMesh);
+
+            let configParams = body["config"];
+            this.mass = configParams["mass"];
+            this.friction = configParams["frictionSlip"];
+            this.suspensionStiffness = configParams["suspensionStiffness"];
+            this.suspensionDamping = configParams["suspensionDamping"];
+            this.suspensionCompression = configParams["suspensionCompression"];
+            this.suspensionRestLength = configParams["suspensionRestLength"];
+            this.rollInfluence = configParams["rollInfluence"];
+        }
+        // 3. load wheel
+        {
+            let wheel = jsonObj["wheel"];
+            let mesh = files[wheel["mesh"]["file"]].scene.getObjectByName(wheel["mesh"]["name"]);
+            if (wheel["mesh"]["translate"]) {
+                mesh.position.set(wheel["mesh"]["translate"][0], wheel["mesh"]["translate"][1], wheel["mesh"]["translate"][2]);
+            }
+            if (wheel["mesh"]["scale"]) {
+                mesh.scale.set(wheel["mesh"]["scale"][0], wheel["mesh"]["scale"][1], wheel["mesh"]["scale"][2]);
+            }
+            if (wheel["mesh"]["rotate"]) {
+                mesh.rotateX(wheel["mesh"]["rotate"][0]);
+                mesh.rotateY(wheel["mesh"]["rotate"][1]);
+                mesh.rotateZ(wheel["mesh"]["rotate"][2]);
+            }
+
+            let wheelBox = new THREE.Box3().setFromObject(mesh);
+            this.wheelPositions = [];
+            this.wheelRadius = [];
+            this.wheelMeshes = [];
+            this.wheelCanDrive = [];
+
+            let wheelConfigs = wheel["configs"];
+            for (let wheelConfig of wheelConfigs) {
+                let radius = (wheelBox.max.y - wheelBox.min.y) * 0.5;
+                let width = wheelBox.max.x - wheelBox.min.x;
+                let wheelMesh = null;
+                if (this.useCalibrateMesh) {
+                    wheelMesh = this.calibrateWheelMesh(radius, width);
+                } else {
+                    wheelMesh = mesh.clone();
+                }
+                
+                let pos = wheelConfig["position"];
+                let drive = wheelConfig["drive"];
+                this.wheelPositions.push(new GAmmo.btVector3(pos[0], pos[1], pos[2]));
+                this.wheelRadius.push(radius);
+                this.wheelMeshes.push(wheelMesh);
+                this.wheelCanDrive.push(drive);
+            }
+        }
+        completed(true, this);
+        return this;
     }
 }
 
@@ -101,12 +204,41 @@ export class Vehicle {
     vehicleInfo: VehicleInfo;
     speedLimit: number = 130;
     engineForce: number = 0;
+    rootThNode: THREE.Object3D;
+    chassisRigidbody: Ammo.btRigidBody;
 
     constructor(physicsWorld: Ammo.btDiscreteDynamicsWorld) {
         this.physicsWorld = physicsWorld;
     }
 
+    dispose() {
+        if (this.vehicle) {
+            this.physicsWorld.removeRigidBody(this.chassisRigidbody);
+            this.physicsWorld.removeAction(this.vehicle);
+        }
+        if (this.rootThNode && this.vehicleInfo) {
+            this.rootThNode.remove(this.vehicleInfo.chassisMesh);
+            for (let wheelMesh of this.vehicleInfo.wheelMeshes) {
+                this.rootThNode.remove(wheelMesh);
+            }
+            this.rootThNode = null;
+        }
+    }
+
+    buildWithConfigFile(fileUrl: string, rootThNode: THREE.Object3D, completed: Function) {
+        this.vehicleInfo = new VehicleInfo();
+        this.vehicleInfo.loadFromConfig(fileUrl, (suc, info) => {
+            if (suc) {
+                this.build(info, rootThNode);
+            }
+            if (completed) {
+                completed(suc);
+            }
+        });
+    }
+
     build(info: VehicleInfo, rootThNode: THREE.Object3D) {
+        this.rootThNode = rootThNode;
         this.vehicleInfo = info;
         let initPos = new GAmmo.btVector3(0, 4, 0);
         this.buildChassis(initPos, info, rootThNode);
@@ -125,6 +257,7 @@ export class Vehicle {
         var body = new GAmmo.btRigidBody(new GAmmo.btRigidBodyConstructionInfo(info.mass, motionState, geometry, localInertia));
         body.setActivationState(this.DISABLE_DEACTIVATION);
         this.physicsWorld.addRigidBody(body);
+        this.chassisRigidbody = body;
         rootThNode.add(info.chassisMesh);
 
         var engineForce = 0;
@@ -146,7 +279,7 @@ export class Vehicle {
         var wheelDirectionCS0 = new GAmmo.btVector3(0, -1, 0);
         var wheelAxleCS = new GAmmo.btVector3(-1, 0, 0);
 
-        for (var i = 0; i < 4; ++i) {
+        for (var i = 0; i < info.wheelPositions.length; ++i) {
             var wheelInfo = vehicle.addWheel(
                 info.wheelPositions[i],
                 wheelDirectionCS0,
@@ -203,7 +336,6 @@ export class Vehicle {
         if (this.engineForce > 0) {
             return;
         }
-        console.log(">>>>>>>>> applyEngineForce 2000");
         this.vehicle.applyEngineForce(2000, 0);
         this.vehicle.applyEngineForce(2000, 1);
         this.engineForce = 2000;
@@ -263,7 +395,7 @@ export class Vehicle {
     }
 
     getCameraTransform() {
-        
+
     }
 
 }

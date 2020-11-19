@@ -76,7 +76,7 @@ function prepare() {
     scene.background = new THREE.Color("#111111");
 
     let directionLight = new THREE.DirectionalLight("#ffffff", 1);
-    directionLight.position.set(2,2,2);
+    directionLight.position.set(2, 2, 2);
     scene.add(directionLight);
 
     let ambientLight = new THREE.AmbientLight("#555555");
@@ -119,15 +119,15 @@ function buildPhysicsWorld() {
     physicsWorld.setGravity(new GAmmo.btVector3(0, -10, 0));
 
     // build floor
-{
-    let motionState = new GAmmo.btDefaultMotionState();
-    let collisionShape = new GAmmo.btStaticPlaneShape(new GAmmo.btVector3(0, 1, 0), 0);
-    let inertia = new GAmmo.btVector3();
-    collisionShape.calculateLocalInertia(0, inertia);
-    let info: Ammo.btRigidBodyConstructionInfo = new GAmmo.btRigidBodyConstructionInfo(0, motionState, collisionShape, inertia);
-    let floorRigidbody = new GAmmo.btRigidBody(info);
-    physicsWorld.addRigidBody(floorRigidbody);
-}
+    {
+        let motionState = new GAmmo.btDefaultMotionState();
+        let collisionShape = new GAmmo.btStaticPlaneShape(new GAmmo.btVector3(0, 1, 0), 0);
+        let inertia = new GAmmo.btVector3();
+        collisionShape.calculateLocalInertia(0, inertia);
+        let info: Ammo.btRigidBodyConstructionInfo = new GAmmo.btRigidBodyConstructionInfo(0, motionState, collisionShape, inertia);
+        let floorRigidbody = new GAmmo.btRigidBody(info);
+        physicsWorld.addRigidBody(floorRigidbody);
+    }
 }
 
 window.onload = () => {
@@ -137,64 +137,13 @@ window.onload = () => {
         // 主流程
         prepare();
 
-
-        const objLoader = new GLTFLoader();
-        objLoader.load('models/01.glb', (root) => {
-            // root.scale.set(0.01, 0.01, 0.01);
-            console.log(root);
-            let bodyMesh = root.scene.getObjectByName("CarBody");
-            let wheelMesh = root.scene.getObjectByName("Wheel");
-            bodyMesh.scale.set(0.01, 0.01, 0.01);
-            wheelMesh.scale.set(0.01, 0.01, 0.01);
-
-        
-            car = new Vehicle(physicsWorld);
-            let vehicleInfo = new VehicleInfo();
-            vehicleInfo.fourWheelStandard();
-
-            let bodyObject3D = new THREE.Object3D();
-            bodyObject3D.add(bodyMesh);
-            bodyMesh.rotateZ(Math.PI);
-            vehicleInfo.chassisMesh = bodyObject3D;
-            let bodyBox = new THREE.Box3().setFromObject(bodyMesh);
-            vehicleInfo.chassisSize = new GAmmo.btVector3(bodyBox.max.x - bodyBox.min.x, bodyBox.max.y - bodyBox.min.y, bodyBox.max.z - bodyBox.min.z);
-
-
-            let wheelBox = new THREE.Box3().setFromObject(wheelMesh);
-            vehicleInfo.wheelPositions = [];
-            vehicleInfo.wheelRadius = [];
-            vehicleInfo.wheelMeshes = [];
-            vehicleInfo.wheelCanDrive = [];
-            // front left
-            let flWheelMesh = wheelMesh.clone();
-            vehicleInfo.wheelPositions.push(new GAmmo.btVector3(0.8, 0.05, 1.1));
-            vehicleInfo.wheelRadius.push((wheelBox.max.y - wheelBox.min.y) * 0.5);
-            vehicleInfo.wheelMeshes.push(flWheelMesh);
-            vehicleInfo.wheelCanDrive.push(true);
-            // front right
-            let frWheelMesh = wheelMesh.clone();
-            vehicleInfo.wheelPositions.push(new GAmmo.btVector3(-0.8, 0.05, 1.1));
-            vehicleInfo.wheelRadius.push((wheelBox.max.y - wheelBox.min.y) * 0.5);
-            vehicleInfo.wheelMeshes.push(frWheelMesh);
-            vehicleInfo.wheelCanDrive.push(true);
-            // back left
-            let blWheelMesh = wheelMesh.clone();
-            vehicleInfo.wheelPositions.push(new GAmmo.btVector3(0.8, 0.05, -1.2));
-            vehicleInfo.wheelRadius.push((wheelBox.max.y - wheelBox.min.y) * 0.5);
-            vehicleInfo.wheelMeshes.push(blWheelMesh);
-            vehicleInfo.wheelCanDrive.push(false);
-            // back right
-            let brWheelMesh = wheelMesh.clone();
-            vehicleInfo.wheelPositions.push(new GAmmo.btVector3(-0.8, 0.05, -1.2));
-            vehicleInfo.wheelRadius.push((wheelBox.max.y - wheelBox.min.y) * 0.5);
-            vehicleInfo.wheelMeshes.push(brWheelMesh);
-            vehicleInfo.wheelCanDrive.push(false);
-
-
-            car.build(vehicleInfo, scene);
-            followCamera.setTarget(car.thChassisNode());
+        car = new Vehicle(physicsWorld);
+        car.buildWithConfigFile("./vehicles/cartoon_01.json", scene, (res) => {
+            if (res) {
+                followCamera.setTarget(car.thChassisNode());
+            }
         });
-        
+
         document.onclick = () => {
         };
 
