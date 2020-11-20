@@ -98,7 +98,7 @@ function render() {
         physicsWorld.stepSimulation(deltaInSecs);
         if (car) {
             car.sync();
-            speedText.innerHTML = "Speed: " + Math.ceil(car.getSpeed()) + "km/h";
+            // speedText.innerHTML = "Speed: " + Math.ceil(car.getSpeed()) + "km/h";
         }
         followCamera.update(deltaInSecs);
         renderer.render(scene, camera);

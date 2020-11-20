@@ -10,10 +10,10 @@
         },
         "config": {
             "mass": 800,
-            "frictionSlip": 1000,
-            "suspensionStiffness": 20.0,
+            "frictionSlip": 10,
+            "suspensionStiffness": 10.0,
             "suspensionDamping": 2.3,
-            "suspensionCompression": 4.4,
+            "suspensionCompression": 1.0,
             "suspensionRestLength": 0.6,
             "rollInfluence": 1.0
         }
@@ -26,19 +26,19 @@
         },
         "configs": [
             {
-                "position": [0.8, 0.05, 1.1],
+                "position": [1, -0.2, 1.1],
                 "drive": true 
             },
             {
-                "position": [-0.8, 0.05, 1.1],
+                "position": [-1, -0.2, 1.1],
                 "drive": true 
             },
             {
-                "position": [0.8, 0.05, -1.2],
+                "position": [1, -0.2, -1.2],
                 "drive": false 
             },
             {
-                "position": [-0.8, 0.05, 1.2],
+                "position": [-1, -0.2, -1.2],
                 "drive": false 
             }
         ]

@@ -32,7 +32,7 @@ export class VehicleInfo {
     maxBreakingForce = 100;
 
     // helpers
-    useCalibrateMesh = true;
+    useCalibrateMesh = false;
 
     // helpers
     fourWheelStandard() {
@@ -81,7 +81,7 @@ export class VehicleInfo {
     calibrateWheelMesh(radius: number, width: number) {
         let gem = new THREE.CylinderGeometry(radius, radius, width);
         let mat = new THREE.MeshPhongMaterial({
-            color: "#ff0000",
+            color: "#00ff00",
             reflectivity: 0.8,
             specular: "#ffffff",
             shininess: 1000
@@ -134,11 +134,11 @@ export class VehicleInfo {
             let bodyBox = new THREE.Box3().setFromObject(mesh);
             this.chassisSize = new GAmmo.btVector3(bodyBox.max.x - bodyBox.min.x, bodyBox.max.y - bodyBox.min.y, bodyBox.max.z - bodyBox.min.z);
             if (this.useCalibrateMesh) {
-                this.chassisMesh = this.calibrateChassisMesh(this.chassisSize);
+                bodyObject3D.add(this.calibrateChassisMesh(this.chassisSize));
             } else {
-                this.chassisMesh = bodyObject3D;
+                bodyObject3D.add(mesh);   
             }
-            bodyObject3D.add(this.chassisMesh);
+            this.chassisMesh = bodyObject3D;
 
             let configParams = body["config"];
             this.mass = configParams["mass"];
@@ -300,6 +300,9 @@ export class Vehicle {
     }
 
     sync() {
+        if (!this.vehicle) {
+            return;
+        }
         {
             let tm = this.vehicle.getChassisWorldTransform();
             let p = tm.getOrigin();
