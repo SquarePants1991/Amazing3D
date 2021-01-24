@@ -9,6 +9,7 @@ export class VehicleInfo {
     mass: number = 800;
     // 底盘
     chassisSize: Ammo.btVector3;
+    chassisCenterOffset: Ammo.btVector3;
     chassisMesh: THREE.Object3D;
 
     // 轮胎
@@ -37,6 +38,7 @@ export class VehicleInfo {
     // helpers
     fourWheelStandard() {
         this.chassisSize = new GAmmo.btVector3(1.8, 0.6, 4);
+        this.chassisCenterOffset = new GAmmo.btVector3(0, 0, 0);
         this.chassisMesh = this.calibrateChassisMesh(this.chassisSize);
 
         // four wheel
@@ -133,6 +135,7 @@ export class VehicleInfo {
             let bodyObject3D = new THREE.Object3D();
             let bodyBox = new THREE.Box3().setFromObject(mesh);
             this.chassisSize = new GAmmo.btVector3(bodyBox.max.x - bodyBox.min.x, bodyBox.max.y - bodyBox.min.y, bodyBox.max.z - bodyBox.min.z);
+            this.chassisCenterOffset = new GAmmo.btVector3((bodyBox.max.x + bodyBox.min.x) * 0.5, (bodyBox.max.y + bodyBox.min.y) * 0.5, (bodyBox.max.z + bodyBox.min.z) * 0.5);
             if (this.useCalibrateMesh) {
                 this.chassisMesh = this.calibrateChassisMesh(this.chassisSize);
             } else {
@@ -247,14 +250,21 @@ export class Vehicle {
 
     // build physics & mesh
     buildChassis(initPos: Ammo.btVector3, info: VehicleInfo, rootThNode: THREE.Object3D) {
-        var geometry = new GAmmo.btBoxShape(new GAmmo.btVector3(info.chassisSize.x() * .5, info.chassisSize.y() * .5, info.chassisSize.z() * .5));
+        var baseShape = new GAmmo.btCompoundShape(true);
+        var boxShape = new GAmmo.btBoxShape(new GAmmo.btVector3(info.chassisSize.x() * .5, info.chassisSize.y() * .5, info.chassisSize.z() * .5));
+        var boxShapeTransform = new GAmmo.btTransform();
+        boxShapeTransform.setIdentity();
+        boxShapeTransform.setOrigin(this.vehicleInfo.chassisCenterOffset);
+        
+        baseShape.addChildShape(boxShapeTransform, boxShape);
+
         var transform = new GAmmo.btTransform();
         transform.setIdentity();
         transform.setOrigin(new GAmmo.btVector3(initPos.x(), initPos.y(), initPos.z()));
         var motionState = new GAmmo.btDefaultMotionState(transform);
         var localInertia = new GAmmo.btVector3(0, 0, 0);
-        geometry.calculateLocalInertia(info.mass, localInertia);
-        var body = new GAmmo.btRigidBody(new GAmmo.btRigidBodyConstructionInfo(info.mass, motionState, geometry, localInertia));
+        baseShape.calculateLocalInertia(info.mass, localInertia);
+        var body = new GAmmo.btRigidBody(new GAmmo.btRigidBodyConstructionInfo(info.mass, motionState, baseShape, localInertia));
         body.setActivationState(this.DISABLE_DEACTIVATION);
         this.physicsWorld.addRigidBody(body);
         this.chassisRigidbody = body;
